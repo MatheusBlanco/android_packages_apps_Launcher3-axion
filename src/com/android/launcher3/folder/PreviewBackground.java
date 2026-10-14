@@ -59,7 +59,8 @@ import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.views.ActivityContext;
 
 /**
- * This object represents a FolderIcon preview background. It stores drawing / measurement
+ * This object represents a FolderIcon preview background. It stores drawing /
+ * measurement
  * information, handles drawing, and animation (accept state <--> rest state).
  */
 public class PreviewBackground extends DelegatedCellDrawing {
@@ -67,14 +68,16 @@ public class PreviewBackground extends DelegatedCellDrawing {
     private static final boolean DRAW_SHADOW = false;
     private static final boolean DRAW_STROKE = false;
 
-    @VisibleForTesting protected static final int CONSUMPTION_ANIMATION_DURATION = 100;
+    @VisibleForTesting
+    protected static final int CONSUMPTION_ANIMATION_DURATION = 100;
 
-    @VisibleForTesting protected static final float HOVER_SCALE = 1.1f;
-    @VisibleForTesting protected static final int HOVER_ANIMATION_DURATION = 300;
+    @VisibleForTesting
+    protected static final float HOVER_SCALE = 1.1f;
+    @VisibleForTesting
+    protected static final int HOVER_ANIMATION_DURATION = 300;
 
     private final Context mContext;
-    private final PorterDuffXfermode mShadowPorterDuffXfermode
-            = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
+    private final PorterDuffXfermode mShadowPorterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
     private RadialGradient mShadowShader = null;
 
     private final Matrix mShaderMatrix = new Matrix();
@@ -101,54 +104,60 @@ public class PreviewBackground extends DelegatedCellDrawing {
 
     private CellLayout mDrawingDelegate;
 
-    // When the PreviewBackground is drawn under an icon (for creating a folder) the border
+    // When the PreviewBackground is drawn under an icon (for creating a folder) the
+    // border
     // should not occlude the icon
     public boolean isClipping = true;
 
     // Drawing / animation configurations
-    @VisibleForTesting protected static final float ACCEPT_SCALE_FACTOR = 1.20f;
+    @VisibleForTesting
+    protected static final float ACCEPT_SCALE_FACTOR = 1.20f;
 
     // Expressed on a scale from 0 to 255.
     private static final int BG_OPACITY = 255;
     private static final int MAX_BG_OPACITY = 255;
     private static final int SHADOW_OPACITY = 40;
 
-    @VisibleForTesting protected ValueAnimator mScaleAnimator;
+    @VisibleForTesting
+    protected ValueAnimator mScaleAnimator;
     private ObjectAnimator mStrokeAlphaAnimator;
     private ObjectAnimator mShadowAnimator;
     private ValueAnimator mBoundsAnimator;
 
-    @VisibleForTesting protected boolean mIsAccepting;
-    @VisibleForTesting protected boolean mIsHovered;
-    @VisibleForTesting protected boolean mIsHoveredOrAnimating;
+    @VisibleForTesting
+    protected boolean mIsAccepting;
+    @VisibleForTesting
+    protected boolean mIsHovered;
+    @VisibleForTesting
+    protected boolean mIsHoveredOrAnimating;
 
-    private static final Property<PreviewBackground, Integer> STROKE_ALPHA =
-            new Property<PreviewBackground, Integer>(Integer.class, "strokeAlpha") {
-                @Override
-                public Integer get(PreviewBackground previewBackground) {
-                    return previewBackground.mStrokeAlpha;
-                }
+    private static final Property<PreviewBackground, Integer> STROKE_ALPHA = new Property<PreviewBackground, Integer>(
+            Integer.class, "strokeAlpha") {
+        @Override
+        public Integer get(PreviewBackground previewBackground) {
+            return previewBackground.mStrokeAlpha;
+        }
 
-                @Override
-                public void set(PreviewBackground previewBackground, Integer alpha) {
-                    previewBackground.mStrokeAlpha = alpha;
-                    previewBackground.invalidate();
-                }
-            };
+        @Override
+        public void set(PreviewBackground previewBackground, Integer alpha) {
+            previewBackground.mStrokeAlpha = alpha;
+            previewBackground.invalidate();
+        }
+    };
 
-    private static final Property<PreviewBackground, Integer> SHADOW_ALPHA =
-            new Property<PreviewBackground, Integer>(Integer.class, "shadowAlpha") {
-                @Override
-                public Integer get(PreviewBackground previewBackground) {
-                    return previewBackground.mShadowAlpha;
-                }
+    private static final Property<PreviewBackground, Integer> SHADOW_ALPHA = new Property<PreviewBackground, Integer>(
+            Integer.class, "shadowAlpha") {
+        @Override
+        public Integer get(PreviewBackground previewBackground) {
+            return previewBackground.mShadowAlpha;
+        }
 
-                @Override
-                public void set(PreviewBackground previewBackground, Integer alpha) {
-                    previewBackground.mShadowAlpha = alpha;
-                    previewBackground.invalidate();
-                }
-            };
+        @Override
+        public void set(PreviewBackground previewBackground, Integer alpha) {
+            previewBackground.mShadowAlpha = alpha;
+            previewBackground.invalidate();
+        }
+    };
 
     static void calculateBackgroundBounds(
             DeviceProfile grid,
@@ -190,8 +199,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
             int iconBottomPaddingInCell = Math.max(0, cellHeight - iconTopInCell - iconSize);
             int iconLeftInCell = Math.max(0, (cellWidth - iconSize) / 2);
 
-            int borderX = grid.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().x;
-            int cardSize = cellWidth + borderX + iconSize;
+            int borderY = grid.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().y;
+            int cardHeight = cellHeight + borderY + iconSize;
 
             if (spanX == 1 && spanY == 1) {
                 backgroundWidth = iconSize;
@@ -205,14 +214,14 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 backgroundTop = iconTopInCell;
             } else if (spanX == 1 && spanY == 2) {
                 backgroundWidth = iconSize;
-                backgroundHeight = cardSize;
+                backgroundHeight = cardHeight;
                 backgroundLeft = iconLeftInCell;
                 backgroundTop = hasLabel
                         ? iconTopInCell
                         : Math.max(0, (availableSpaceY - backgroundHeight) / 2);
             } else if (spanX == 2 && spanY == 2) {
                 backgroundWidth = Math.max(iconSize, availableSpaceX - 2 * iconLeftInCell);
-                backgroundHeight = backgroundWidth;
+                backgroundHeight = cardHeight;
                 backgroundLeft = iconLeftInCell;
                 backgroundTop = hasLabel
                         ? iconTopInCell
@@ -220,7 +229,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
             } else {
                 backgroundLeft = iconLeftInCell;
                 backgroundWidth = Math.max(iconSize, availableSpaceX - 2 * iconLeftInCell);
-                backgroundHeight = Math.max(iconSize, availableSpaceY - (hasLabel ? (iconTopInCell + iconBottomPaddingInCell) : 2 * iconTopInCell));
+                backgroundHeight = Math.max(iconSize,
+                        availableSpaceY - (hasLabel ? (iconTopInCell + iconBottomPaddingInCell) : 2 * iconTopInCell));
                 backgroundTop = hasLabel
                         ? iconTopInCell
                         : Math.max(0, (availableSpaceY - backgroundHeight) / 2);
@@ -228,10 +238,10 @@ public class PreviewBackground extends DelegatedCellDrawing {
         }
 
         outBounds.set(
-            backgroundLeft,
-            backgroundTop,
-            backgroundLeft + backgroundWidth,
-            backgroundTop + backgroundHeight);
+                backgroundLeft,
+                backgroundTop,
+                backgroundLeft + backgroundWidth,
+                backgroundTop + backgroundHeight);
     }
 
     public PreviewBackground(Context context) {
@@ -278,18 +288,19 @@ public class PreviewBackground extends DelegatedCellDrawing {
         mIsWorkspace = isWorkspace;
 
         int labelHeight = (invalidateDelegate instanceof FolderIcon folderIcon)
-                ? folderIcon.getFolderLabelHeight() : 0;
+                ? folderIcon.getFolderLabelHeight()
+                : 0;
 
         calculateBackgroundBounds(
-            grid,
-            availableSpaceX,
-            availableSpaceY,
-            topPadding,
-            spanX,
-            spanY,
-            labelHeight,
-            isWorkspace,
-            mBackgroundBounds);
+                grid,
+                availableSpaceX,
+                availableSpaceY,
+                topPadding,
+                spanX,
+                spanY,
+                labelHeight,
+                isWorkspace,
+                mBackgroundBounds);
         mTargetBackgroundBounds.set(mBackgroundBounds);
 
         // Stroke width is 1dp
@@ -300,8 +311,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
             float shadowRadius = radius + mStrokeWidth;
             int shadowColor = Color.argb(SHADOW_OPACITY, 0, 0, 0);
             mShadowShader = new RadialGradient(0, 0, 1,
-                    new int[]{shadowColor, Color.TRANSPARENT},
-                    new float[]{radius / shadowRadius, 1},
+                    new int[] { shadowColor, Color.TRANSPARENT },
+                    new float[] { radius / shadowRadius, 1 },
                     Shader.TileMode.CLAMP);
         }
 
@@ -330,7 +341,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
         }
 
         Rect endBounds = new Rect(mBackgroundBounds);
-        if (startBounds.equals(endBounds)) return;
+        if (startBounds.equals(endBounds))
+            return;
 
         ValueAnimator animator = ValueAnimator.ofObject(
                 new RectEvaluator(new Rect()),
@@ -370,10 +382,10 @@ public class PreviewBackground extends DelegatedCellDrawing {
         float halfHeight = mBackgroundBounds.height() * scale / 2f;
 
         mScaledBackgroundBounds.set(
-            centerX - halfWidth,
-            centerY - halfHeight,
-            centerX + halfWidth,
-            centerY + halfHeight);
+                centerX - halfWidth,
+                centerY - halfHeight,
+                centerX + halfWidth,
+                centerY + halfHeight);
 
         return mScaledBackgroundBounds;
     }
@@ -403,8 +415,10 @@ public class PreviewBackground extends DelegatedCellDrawing {
     }
 
     /**
-     * Returns the progress of the scale animation to accept state, where 0 means the scale is at
-     * 1f and 1 means the scale is at ACCEPT_SCALE_FACTOR. Returns 0 when scaled due to hover.
+     * Returns the progress of the scale animation to accept state, where 0 means
+     * the scale is at
+     * 1f and 1 means the scale is at ACCEPT_SCALE_FACTOR. Returns 0 when scaled due
+     * to hover.
      */
     float getAcceptScaleProgress() {
         return mIsHoveredOrAnimating ? 0 : (mScale - 1f) / (ACCEPT_SCALE_FACTOR - 1f);
@@ -472,8 +486,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
         }
 
         if (shape instanceof ShapeDelegate.RoundedSquare roundedSquare) {
-            float fixedRadius =
-                    bounds.width() / 2f * roundedSquare.getRadiusRatio() * scale;
+            float fixedRadius = bounds.width() / 2f * roundedSquare.getRadiusRatio() * scale;
             return Math.min(
                     fixedRadius,
                     Math.min(bounds.width(), bounds.height()) / 2f);
@@ -672,8 +685,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
 
         final float startScale = mScale;
         final float endScale = isAccepting ? ACCEPT_SCALE_FACTOR : (isHovered ? HOVER_SCALE : 1f);
-        Interpolator interpolator =
-                isAccepting != mIsAccepting ? ACCELERATE_DECELERATE : EMPHASIZED_DECELERATE;
+        Interpolator interpolator = isAccepting != mIsAccepting ? ACCELERATE_DECELERATE : EMPHASIZED_DECELERATE;
         int duration = isAccepting != mIsAccepting ? CONSUMPTION_ANIMATION_DURATION
                 : HOVER_ANIMATION_DURATION;
         mIsAccepting = isAccepting;
@@ -685,7 +697,6 @@ public class PreviewBackground extends DelegatedCellDrawing {
             mIsHoveredOrAnimating = mIsHovered;
             return;
         }
-
 
         mScaleAnimator = ValueAnimator.ofFloat(0f, 1.0f);
         mScaleAnimator.addUpdateListener(animation -> {

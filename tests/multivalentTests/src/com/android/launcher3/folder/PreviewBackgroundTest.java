@@ -23,7 +23,11 @@ import static com.android.launcher3.folder.PreviewBackground.HOVER_SCALE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.PathInterpolator;
 
@@ -32,6 +36,8 @@ import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.launcher3.CellLayout;
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.deviceprofile.WorkspaceProfile;
 import com.android.launcher3.util.LauncherMultivalentJUnit;
 
 import org.junit.Before;
@@ -81,6 +87,33 @@ public class PreviewBackgroundTest {
         endAnimation();
         assertEquals("Scale progress not 0.", mPreviewBackground.getAcceptScaleProgress(), 0,
                 EPSILON);
+    }
+
+    @Test
+    public void testVerticalWorkspaceBackgroundUsesVerticalCellDimensions() {
+        DeviceProfile deviceProfile = mock(DeviceProfile.class);
+        WorkspaceProfile workspaceProfile = mock(WorkspaceProfile.class);
+        when(deviceProfile.getWorkspaceIconProfile()).thenReturn(workspaceProfile);
+        when(workspaceProfile.getIconSizePx()).thenReturn(48);
+        when(workspaceProfile.getCellSize()).thenReturn(new Point(90, 140));
+        when(workspaceProfile.getCellHeightPx()).thenReturn(100);
+        when(workspaceProfile.getCellYPaddingPx()).thenReturn(8);
+        when(workspaceProfile.getCellLayoutBorderSpacePx()).thenReturn(new Point(10, 20));
+
+        Rect bounds = new Rect();
+        PreviewBackground.calculateBackgroundBounds(
+                deviceProfile,
+                190,
+                280,
+                0,
+                1,
+                2,
+                18,
+                true,
+                bounds);
+
+        assertEquals(48, bounds.width());
+        assertEquals(208, bounds.height());
     }
 
     @Test
