@@ -470,13 +470,20 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public RunnableList startActivitySafely(View v, Intent intent, ItemInfo item) {
         PredictionRowView<?> predictionRowView =
                 getAppsView().getFloatingHeaderView().findFixedRowByType(PredictionRowView.class);
+        boolean paused = false;
         // Pause the prediction row updates until the transition (if it exists) ends.
-        predictionRowView.setPredictionUiUpdatePaused(true);
+        if (predictionRowView != null) {
+            predictionRowView.setPredictionUiUpdatePaused(true);
+            paused = true;
+        }
         RunnableList result = super.startActivitySafely(v, intent, item);
-        if (result == null) {
-            predictionRowView.setPredictionUiUpdatePaused(false);
-        } else {
-            result.add(() -> predictionRowView.setPredictionUiUpdatePaused(false));
+        if (paused) {
+            if (result == null) {
+                predictionRowView.setPredictionUiUpdatePaused(false);
+            } else {
+                PredictionRowView<?> finalRow = predictionRowView;
+                result.add(() -> finalRow.setPredictionUiUpdatePaused(false));
+            }
         }
         return result;
     }
@@ -678,10 +685,18 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             case Favorites.CONTAINER_ALL_APPS_PREDICTION:
                 mAllAppsPredictions = info;
                 AxSmartDrawerManager.INSTANCE.get(this).setPredictedItems(info.getContents());
-                getAppsView().getFloatingHeaderView().findFixedRowByType(
-                        PredictionRowView.class).setPredictedApps(info.getContents());
+                PredictionRowView<?> predictionRowView =
+                        getAppsView().getFloatingHeaderView().findFixedRowByType(
+                                PredictionRowView.class);
+                if (predictionRowView != null) {
+                    predictionRowView.setPredictedApps(info.getContents());
+                }
                 if (AxSmartDrawerManager.isEnabled(this)) {
-                    getAppsView().onAppsUpdated();
+                    // Rebuilding the adapter list is required so that the smart drawer
+                    // picks up the new prediction keys. getAppsView().onAppsUpdated() is
+                    // not enough: rebindAdapters() short-circuits when the work tab
+                    // visibility is unchanged and never re-runs getEntries().
+                    getAppsView().getPersonalAppList().onAppsUpdated();
                 }
                 break;
             case Favorites.CONTAINER_HOTSEAT_PREDICTION:
@@ -1724,7 +1739,11 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         PredictionRowView<?> predictionRowView =
                 getAppsView().getFloatingHeaderView().findFixedRowByType(
                         PredictionRowView.class);
-        predictionRowView.dump(prefix, writer);
+        if (predictionRowView != null) {
+            predictionRowView.dump(prefix, writer);
+        } else {
+            writer.println(prefix + "PredictionRowView (not found)");
+        }
     }
 
     @Override

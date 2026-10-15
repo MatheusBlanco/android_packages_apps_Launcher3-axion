@@ -138,45 +138,42 @@ class PredictorState(
         predictionContext: AppPredictionContext,
         model: LauncherModel,
         taskFactory: (PredictorState, List<AppTarget>) -> ModelUpdateTask,
+        fallbackToUsageStats: Boolean = false,
     ) {
         destroyPredictor()
 
         val apm = ctx.getSystemService(AppPredictionManager::class.java)
         lastTargets = emptyList()
 
+        // Keep the local state around so we can fall back to the usage stats when the
+        // system prediction service is unavailable or never delivers any result (for
+        // example when Android System Intelligence is not installed).
+        localModel = model
+        localTaskFactory = taskFactory
+        localMaxCount = predictionContext.predictedTargetCount
+
         if (apm != null) {
             predictor =
                 apm.createAppPredictionSession(predictionContext).apply {
-                    registerPredictionUpdates(MODEL_EXECUTOR) {
-                        val oldTargets = lastTargets
-                        lastTargets = it
-
-                        // If no diff, skip
-                        if (
-                            oldTargets.size != lastTargets.size ||
-                                oldTargets.zip(lastTargets).any { (a1, a2) ->
-                                    !areAppTargetsSame(a1, a2)
-                                }
-                        ) {
-                            model.enqueueModelUpdateTask(
-                                taskFactory.invoke(this@PredictorState, it)
-                            )
-                        }
+                    registerPredictionUpdates(MODEL_EXECUTOR) { targets ->
+                        val resolved =
+                            if (fallbackToUsageStats && targets.isEmpty()) {
+                                queryLocalTargets(ctx, predictionContext.predictedTargetCount)
+                            } else {
+                                targets
+                            }
+                        enqueueIfChanged(resolved)
                     }
                     requestPredictionUpdate()
                 }
+            if (fallbackToUsageStats) {
+                // The session may never deliver a result when no prediction provider is
+                // installed, so seed the suggestions with the local usage stats.
+                enqueueIfChanged(queryLocalTargets(ctx, predictionContext.predictedTargetCount))
+            }
         } else {
             localCtx = ctx
-            localModel = model
-            localMaxCount = predictionContext.predictedTargetCount
-            localTaskFactory = taskFactory
-            val targets = queryLocalTargets(ctx, predictionContext.predictedTargetCount)
-            lastTargets = targets
-            if (targets.isNotEmpty()) {
-                model.enqueueModelUpdateTask(
-                    taskFactory.invoke(this@PredictorState, targets)
-                )
-            }
+            enqueueIfChanged(queryLocalTargets(ctx, predictionContext.predictedTargetCount))
         }
     }
 
@@ -195,22 +192,23 @@ class PredictorState(
         if (predictor != null) {
             predictor?.requestPredictionUpdate()
         } else {
-            localCtx?.let { ctx ->
-                localModel?.let { model ->
-                    localTaskFactory?.let { factory ->
-                        val targets = queryLocalTargets(ctx, localMaxCount)
-                        if (targets != lastTargets) {
-                            lastTargets = targets
-                            if (targets.isNotEmpty()) {
-                                model.enqueueModelUpdateTask(
-                                    factory.invoke(this@PredictorState, targets)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            localCtx?.let { ctx -> enqueueIfChanged(queryLocalTargets(ctx, localMaxCount)) }
         }
+    }
+
+    /** Enqueues an update task if the given targets differ from the last published ones. */
+    private fun enqueueIfChanged(targets: List<AppTarget>) {
+        val oldTargets = lastTargets
+        lastTargets = targets
+        if (
+            oldTargets.size == targets.size &&
+                oldTargets.zip(targets).all { (a1, a2) -> areAppTargetsSame(a1, a2) }
+        ) {
+            return
+        }
+        val model = localModel ?: return
+        val factory = localTaskFactory ?: return
+        model.enqueueModelUpdateTask(factory.invoke(this, targets))
     }
 
     /** see [AppPredictor.notifyAppTargetEvent] */
@@ -251,18 +249,24 @@ fun queryLocalTargets(ctx: Context, maxCount: Int): List<AppTarget> {
                     .filter { it.lastTimeUsed >= startTime }
                     .sortedByDescending { it.lastTimeUsed }
                     .distinctBy { it.packageName }
-                    .take(maxCount)
+                    .asSequence()
+                    // Resolve each candidate to a launchable activity before taking the top
+                    // results. Packages without a launcher entry (for example system services)
+                    // must not consume a prediction slot, otherwise the suggested row ends up
+                    // one entry short.
                     .mapNotNull { us ->
-                        la.getActivityList(us.packageName, myUser)?.firstOrNull()?.let { lai ->
-                            AppTarget.Builder(
-                                AppTargetId("app:" + us.packageName),
-                                us.packageName,
-                                myUser
-                            )
-                                .setClassName(lai.componentName.className)
-                                .build()
-                        }
+                        val lai = la.getActivityList(us.packageName, myUser)?.firstOrNull()
+                            ?: return@mapNotNull null
+                        AppTarget.Builder(
+                            AppTargetId("app:" + us.packageName),
+                            us.packageName,
+                            myUser
+                        )
+                            .setClassName(lai.componentName.className)
+                            .build()
                     }
+                    .take(maxCount)
+                    .toList()
                 if (targets.isNotEmpty()) return targets
             }
         }

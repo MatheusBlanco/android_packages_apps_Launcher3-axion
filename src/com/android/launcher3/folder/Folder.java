@@ -277,7 +277,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     private final @NonNull GradientDrawable mBackground;
 
-    private static final boolean ENABLE_FOLDER_BLUR = false;
+    private static final boolean ENABLE_FOLDER_BLUR = true;
 
     private final AxBackdropBlurSurface mBlurSurface;
     private final Paint mBlurSurfaceFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

@@ -132,7 +132,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
     PreviewBackground mBackground = new PreviewBackground(getContext());
 
-    private static final boolean ENABLE_FOLDER_BLUR = false;
+    private static final boolean ENABLE_FOLDER_BLUR = true;
 
     private AxBackdropBlurSurface mBlurSurface;
 

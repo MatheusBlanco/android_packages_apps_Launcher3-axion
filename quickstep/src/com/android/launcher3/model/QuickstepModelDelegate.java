@@ -300,7 +300,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
                     .setPredictedTargetCount(mIDP.numDatabaseAllAppsColumns)
                     .build(),
                 mModel,
-                PredictionUpdateTask::new);
+                PredictionUpdateTask::new,
+                true /* fallbackToUsageStats */);
 
 
         // TODO: get bundle
@@ -314,7 +315,8 @@ public class QuickstepModelDelegate extends ModelDelegate {
                             .setPredictedTargetCount(NUM_OF_RECOMMENDED_WIDGETS_PREDICATION)
                             .build(),
                     mModel,
-                    WidgetsPredictionUpdateTask::new);
+                    WidgetsPredictionUpdateTask::new,
+                    false /* fallbackToUsageStats */);
         }
     }
 
@@ -333,7 +335,7 @@ public class QuickstepModelDelegate extends ModelDelegate {
                     .setPredictedTargetCount(mIDP.numDatabaseHotseatIcons)
                     .setExtras(getBundleForHotseatPredictions(context, mDataModel))
                     .build(),
-                mModel, PredictionUpdateTask::new);
+                mModel, PredictionUpdateTask::new, false /* fallbackToUsageStats */);
     }
 
     @VisibleForTesting
