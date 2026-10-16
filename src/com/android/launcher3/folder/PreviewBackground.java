@@ -21,42 +21,42 @@ import static com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
 
+import java.nio.file.Path;
+
+import javax.naming.Context;
+import javax.swing.plaf.synth.Region;
+import javax.swing.text.View;
+
+import org.w3c.dom.css.Rect;
+
+import com.android.launcher3.CellLayout;
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
+import com.android.launcher3.R;
+import com.android.launcher3.celllayout.DelegatedCellDrawing;
+import com.android.launcher3.graphics.ShapeDelegate;
+import com.android.launcher3.graphics.ThemeManager;
+import com.android.launcher3.views.ActivityContext;
+import com.android.launcher3.widget.RoundedCornerEnforcement;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.RectEvaluator;
 import android.animation.ValueAnimator;
-import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RadialGradient;
-import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Region;
 import android.graphics.Shader;
 import android.util.Property;
-import android.view.View;
 import android.view.animation.Interpolator;
-
 import androidx.annotation.VisibleForTesting;
-
-import com.android.axion.blur.AxBlurColors;
-import com.android.launcher3.CellLayout;
-import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
-import com.android.launcher3.LauncherPrefsExt;
-import com.android.launcher3.R;
-import com.android.launcher3.widget.RoundedCornerEnforcement;
-import com.android.launcher3.celllayout.DelegatedCellDrawing;
-import com.android.launcher3.graphics.ShapeDelegate;
-import com.android.launcher3.graphics.ThemeManager;
-import com.android.launcher3.views.ActivityContext;
 
 /**
  * This object represents a FolderIcon preview background. It stores drawing /
@@ -196,11 +196,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
                             : Math.max(0, (cellHeight - cHeight) / 2))
                     : Math.max(0, (cellHeight - iconSize) / 2);
 
-            int iconBottomPaddingInCell = Math.max(0, cellHeight - iconTopInCell - iconSize);
             int iconLeftInCell = Math.max(0, (cellWidth - iconSize) / 2);
-
-            int borderY = grid.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().y;
-            int cardHeight = cellHeight + borderY + iconSize;
 
             if (spanX == 1 && spanY == 1) {
                 backgroundWidth = iconSize;
@@ -212,28 +208,15 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 backgroundHeight = iconSize;
                 backgroundLeft = iconLeftInCell;
                 backgroundTop = iconTopInCell;
-            } else if (spanX == 1 && spanY == 2) {
-                backgroundWidth = iconSize;
-                backgroundHeight = cardHeight;
-                backgroundLeft = iconLeftInCell;
-                backgroundTop = hasLabel
-                        ? iconTopInCell
-                        : Math.max(0, (availableSpaceY - backgroundHeight) / 2);
-            } else if (spanX == 2 && spanY == 2) {
-                backgroundWidth = Math.max(iconSize, availableSpaceX - 2 * iconLeftInCell);
-                backgroundHeight = cardHeight;
-                backgroundLeft = iconLeftInCell;
-                backgroundTop = hasLabel
-                        ? iconTopInCell
-                        : Math.max(0, (availableSpaceY - backgroundHeight) / 2);
             } else {
+                // Top aligns with row 0 icon top, bottom with the last row's icon bottom.
+                int borderY = grid.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().y;
                 backgroundLeft = iconLeftInCell;
-                backgroundWidth = Math.max(iconSize, availableSpaceX - 2 * iconLeftInCell);
-                backgroundHeight = Math.max(iconSize,
-                        availableSpaceY - (hasLabel ? (iconTopInCell + iconBottomPaddingInCell) : 2 * iconTopInCell));
-                backgroundTop = hasLabel
-                        ? iconTopInCell
-                        : Math.max(0, (availableSpaceY - backgroundHeight) / 2);
+                backgroundWidth = spanX == 1
+                        ? iconSize
+                        : Math.max(iconSize, availableSpaceX - 2 * iconLeftInCell);
+                backgroundHeight = (spanY - 1) * (cellHeight + borderY) + iconSize;
+                backgroundTop = iconTopInCell;
             }
         }
 
