@@ -21,14 +21,6 @@ import static com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound;
 
-import java.nio.file.Path;
-
-import javax.naming.Context;
-import javax.swing.plaf.synth.Region;
-import javax.swing.text.View;
-
-import org.w3c.dom.css.Rect;
-
 import com.android.launcher3.CellLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
@@ -44,17 +36,22 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.RectEvaluator;
 import android.animation.ValueAnimator;
+import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RadialGradient;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Region;
 import android.graphics.Shader;
 import android.util.Property;
+import android.view.View;
 import android.view.animation.Interpolator;
 import androidx.annotation.VisibleForTesting;
 
