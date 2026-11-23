@@ -1684,6 +1684,30 @@ public class Launcher extends StatefulActivity<LauncherState>
         toggleAllApps(/* alreadyOnHome= */ true, focusSearch);
     }
 
+    /**
+     * Opens All Apps and immediately focuses the search field, showing the keyboard.
+     *
+     * <p>Unlike {@link #toggleAllApps(boolean)}, this always focuses the search field even when
+     * {@link LauncherPrefsExt#DRAWER_OPEN_KEYBOARD} is disabled.
+     */
+    public void openAllAppsSearch() {
+        if (getStateManager().isInStableState(ALL_APPS)) {
+            getAppsView().getSearchUiManager().focusSearchField();
+            return;
+        }
+        if (mWorkspace.isOverlayShown()) {
+            mOverlayManager.hideOverlay(/* animate */ true);
+        }
+        AbstractFloatingView.closeAllOpenViews(this);
+        getStateManager().goToState(ALL_APPS, true /* animated */,
+                new AnimationSuccessListener() {
+                    @Override
+                    public void onAnimationSuccess(Animator animator) {
+                        getAppsView().getSearchUiManager().focusSearchField();
+                    }
+                });
+    }
+
     private void toggleAllApps(boolean alreadyOnHome, boolean focusSearch) {
         if (getStateManager().isInStableState(ALL_APPS)) {
             getStateManager().goToState(NORMAL, alreadyOnHome);

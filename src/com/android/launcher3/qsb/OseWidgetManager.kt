@@ -209,6 +209,7 @@ constructor(
     companion object {
         private const val TAG = "OseWidgetManager"
         const val SEARCH_PROVIDER_NONE = "none"
+        const val SEARCH_PROVIDER_MINIMAL = "minimal"
 
         @JvmStatic
         fun isSearchBarEnabled(context: Context): Boolean =
@@ -221,6 +222,16 @@ constructor(
                 provider.isNotBlank() &&
                 provider != SEARCH_PROVIDER_NONE
         }
+
+        @JvmStatic
+        fun isMinimalSearchBar(context: Context): Boolean =
+            isMinimalSearchBar(LauncherPrefs.get(context))
+
+        @JvmStatic
+        fun isMinimalSearchBar(launcherPrefs: LauncherPrefs): Boolean =
+            isSearchBarEnabled(launcherPrefs) &&
+                launcherPrefs.get(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER) ==
+                    SEARCH_PROVIDER_MINIMAL
 
         @JvmStatic
         fun getAvailableSearchWidgets(context: Context): List<AppWidgetProviderInfo> =
@@ -253,6 +264,11 @@ constructor(
             fallbackPackage: String?,
         ): AppWidgetProviderInfo? {
             if (!isSearchBarEnabled(launcherPrefs)) return null
+            if (launcherPrefs.get(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER) ==
+                SEARCH_PROVIDER_MINIMAL
+            ) {
+                return null
+            }
             val selectedProvider = launcherPrefs.get(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER)
             ComponentName.unflattenFromString(selectedProvider)?.let {
                 findSearchWidgetForPackage(context, it.packageName)?.let { widget -> return widget }

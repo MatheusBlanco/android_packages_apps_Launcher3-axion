@@ -150,6 +150,34 @@ object LauncherPrefsExt {
         backedUpItem("pref_hotseat_search_bar", true, EncryptionType.SECURE_SETTINGS)
     @JvmField val HOTSEAT_SEARCH_PROVIDER =
         backedUpItem("pref_hotseat_search_provider", "none", EncryptionType.SECURE_SETTINGS)
+    @JvmField val DOCK_BG_ENABLED =
+        backedUpItem("pref_dock_bg_enabled", false, EncryptionType.SECURE_SETTINGS)
+    @JvmField val DOCK_BG_STYLE =
+        backedUpItem(
+            "pref_dock_bg_style",
+            com.android.launcher3.graphics.DockBackgroundStyle.STYLE_BLUR,
+            EncryptionType.SECURE_SETTINGS,
+        )
+    @JvmField val DOCK_BG_COLOR_SOURCE =
+        backedUpItem(
+            "pref_dock_bg_color_source",
+            com.android.launcher3.graphics.DockBackgroundStyle.COLOR_SOURCE_MONET,
+            EncryptionType.SECURE_SETTINGS,
+        )
+    @JvmField val DOCK_BG_COLOR =
+        backedUpItem("pref_dock_bg_color", 0, EncryptionType.SECURE_SETTINGS)
+    @JvmField val DOCK_BG_OPACITY =
+        backedUpItem(
+            "pref_dock_bg_opacity",
+            com.android.launcher3.graphics.DockBackgroundStyle.DEFAULT_OPACITY,
+            EncryptionType.SECURE_SETTINGS,
+        )
+    @JvmField val DOCK_BG_RADIUS =
+        backedUpItem(
+            "pref_dock_bg_radius",
+            com.android.launcher3.graphics.DockBackgroundStyle.DEFAULT_RADIUS_DP,
+            EncryptionType.SECURE_SETTINGS,
+        )
     @JvmField val WORKSPACE_DOUBLE_TAP_ACTION =
         backedUpItem(
             "pref_workspace_double_tap_action",
@@ -435,6 +463,12 @@ object LauncherPrefsExt {
         WORKSPACE_WIDGET_UNLIMITED_SIZE,
         HOTSEAT_SEARCH_BAR,
         HOTSEAT_SEARCH_PROVIDER,
+        DOCK_BG_ENABLED,
+        DOCK_BG_STYLE,
+        DOCK_BG_COLOR_SOURCE,
+        DOCK_BG_COLOR,
+        DOCK_BG_OPACITY,
+        DOCK_BG_RADIUS,
         WORKSPACE_DOUBLE_TAP_ACTION,
         ICON_PACK_PACKAGE,
         THEMED_ICONS_ENABLED,

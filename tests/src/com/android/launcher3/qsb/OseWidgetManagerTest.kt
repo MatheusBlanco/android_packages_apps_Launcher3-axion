@@ -25,7 +25,7 @@ import android.content.ComponentName
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.launcher3.LauncherPrefs
+import com.android.launcher3.LauncherPrefsExt
 import com.android.launcher3.qsb.OSEManager.Companion.OSE_LOOPER
 import com.android.launcher3.qsb.OSEManager.OSEInfo
 import com.android.launcher3.util.DaggerSingletonTracker
@@ -36,7 +36,9 @@ import com.android.launcher3.util.rule.ShellCommandRule
 import com.android.launcher3.util.ui.TestViewHelpers
 import com.android.launcher3.widget.util.WidgetSizeHandler
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -47,6 +49,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -73,7 +76,10 @@ class OseWidgetManagerTest {
         doReturn(mockOseInfo).whenever(oseManager).oseInfo
         doReturn(Bundle()).whenever(sizeHandler).getHotseatQsbSizeOptions()
         doReturn(true).whenever(widgetManager).bindAppWidgetIdIfAllowed(any(), any(), any(), any())
-        context.appComponent.launcherPrefs.put(LauncherPrefs.HOTSEAT_SEARCH_PROVIDER, TEST_PKG)
+        context.appComponent.launcherPrefs.put(
+            LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+            TEST_PKG,
+        )
     }
 
     @Test
@@ -220,6 +226,35 @@ class OseWidgetManagerTest {
         TestUtil.runOnExecutorSync(executor) {}
         verify(widgetHost).deleteAppWidgetId(newWidgetId)
         verify(widgetHost).setActiveWidget(eq(INVALID_APPWIDGET_ID), isNull())
+    }
+
+    @Test
+    fun minimal_provider_does_not_bind_widget() {
+        context.appComponent.launcherPrefs.put(
+            LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+            OseWidgetManager.SEARCH_PROVIDER_MINIMAL,
+        )
+        doReturn(INVALID_APPWIDGET_ID).whenever(widgetHost).getBoundWidgetId()
+
+        createOseWidgetManager()
+        TestUtil.runOnExecutorSync(executor) {}
+        verify(widgetHost).setActiveWidget(eq(INVALID_APPWIDGET_ID), isNull())
+        verify(widgetHost, never()).allocateAppWidgetId()
+    }
+
+    @Test
+    fun isMinimalSearchBar_requires_enabled_search_bar() {
+        val prefs = context.appComponent.launcherPrefs
+        prefs.put(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER, OseWidgetManager.SEARCH_PROVIDER_MINIMAL)
+        prefs.put(LauncherPrefsExt.HOTSEAT_SEARCH_BAR, true)
+        assertTrue(OseWidgetManager.isMinimalSearchBar(prefs))
+
+        prefs.put(LauncherPrefsExt.HOTSEAT_SEARCH_BAR, false)
+        assertFalse(OseWidgetManager.isMinimalSearchBar(prefs))
+
+        prefs.put(LauncherPrefsExt.HOTSEAT_SEARCH_BAR, true)
+        prefs.put(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER, OseWidgetManager.SEARCH_PROVIDER_NONE)
+        assertFalse(OseWidgetManager.isMinimalSearchBar(prefs))
     }
 
     private fun createOseWidgetManager() =

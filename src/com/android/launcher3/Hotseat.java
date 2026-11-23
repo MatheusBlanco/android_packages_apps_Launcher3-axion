@@ -25,7 +25,10 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -40,6 +43,8 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.ShortcutAndWidgetContainer.TranslationProvider;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
+import com.android.launcher3.graphics.AxBackdropBlurSurface;
+import com.android.launcher3.graphics.DockBackgroundStyle;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.launcher3.util.LauncherBindableItemsContainer.ItemOperator;
@@ -96,6 +101,21 @@ public class Hotseat extends CellLayout implements Insettable {
     private final View mQsb;
     private final Rect mInsets = new Rect();
 
+    private final AxBackdropBlurSurface mDockBlurSurface;
+    private final Paint mDockFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF mDockBounds = new RectF();
+    private boolean mDockPrefsRegistered;
+    private boolean mDockStyleInitialized;
+    private boolean mDockEnabled;
+    private boolean mDockBlurred;
+    private float mDockRadiusPx;
+    private int mDockBlurTintColor;
+    private int mDockSolidColor;
+    private final LauncherPrefChangeListener mDockPrefListener = key -> {
+        refreshDockStyle();
+        invalidate();
+    };
+
     public Hotseat(Context context) {
         this(context, null);
     }
@@ -120,6 +140,40 @@ public class Hotseat extends CellLayout implements Insettable {
                 VIEW_TRANSLATE_X, ICONS_TRANSLATION_X_CHANNELS_COUNT, Float::sum);
         mQsbAlphaChannels = new MultiValueAlpha(mQsb, ALPHA_CHANNEL_CHANNELS_COUNT);
         mQsbAlphaChannels.setUpdateVisibility(true);
+        mDockBlurSurface = new AxBackdropBlurSurface(this, mActivity);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (mDockPrefsRegistered) return;
+        LauncherPrefs.get(getContext()).addListener(
+                mDockPrefListener,
+                LauncherPrefsExt.DOCK_BG_ENABLED,
+                LauncherPrefsExt.DOCK_BG_STYLE,
+                LauncherPrefsExt.DOCK_BG_COLOR_SOURCE,
+                LauncherPrefsExt.DOCK_BG_COLOR,
+                LauncherPrefsExt.DOCK_BG_OPACITY,
+                LauncherPrefsExt.DOCK_BG_RADIUS);
+        mDockPrefsRegistered = true;
+        refreshDockStyle();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (mDockPrefsRegistered) {
+            LauncherPrefs.get(getContext()).removeListener(
+                    mDockPrefListener,
+                    LauncherPrefsExt.DOCK_BG_ENABLED,
+                    LauncherPrefsExt.DOCK_BG_STYLE,
+                    LauncherPrefsExt.DOCK_BG_COLOR_SOURCE,
+                    LauncherPrefsExt.DOCK_BG_COLOR,
+                    LauncherPrefsExt.DOCK_BG_OPACITY,
+                    LauncherPrefsExt.DOCK_BG_RADIUS);
+            mDockPrefsRegistered = false;
+        }
+        mDockBlurSurface.release();
     }
 
     /** Provides translation X for hotseat icons for the channel. */
@@ -359,6 +413,7 @@ public class Hotseat extends CellLayout implements Insettable {
         int qsbMeasuredHeight = mQsb.getMeasuredHeight();
         if (qsbMeasuredWidth == 0 || qsbMeasuredHeight == 0) {
             mQsb.layout(0, 0, 0, 0);
+            updateDockBounds();
             return;
         }
         int left;
@@ -375,6 +430,83 @@ public class Hotseat extends CellLayout implements Insettable {
         int bottom = b - t - dp.getQsbOffsetY();
         int top = bottom - qsbMeasuredHeight;
         mQsb.layout(left, top, right, bottom);
+        updateDockBounds();
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        drawDockBackground(canvas);
+        super.dispatchDraw(canvas);
+    }
+
+    private void drawDockBackground(Canvas canvas) {
+        if (!mDockStyleInitialized) {
+            refreshDockStyle();
+        }
+        if (!mDockEnabled) return;
+        if (mDockBounds.isEmpty()) return;
+        if (mActivity.getDeviceProfile().isVerticalBarLayout()) return;
+
+        float radius = Math.min(
+                mDockRadiusPx,
+                Math.min(mDockBounds.width(), mDockBounds.height()) / 2f);
+        boolean drewBlur = false;
+        if (mDockBlurred && mDockBlurSurface.isActive()) {
+            drewBlur = mDockBlurSurface.drawRect(canvas,
+                    (int) mDockBounds.left,
+                    (int) mDockBounds.top,
+                    (int) mDockBounds.right,
+                    (int) mDockBounds.bottom,
+                    radius);
+        }
+        mDockFillPaint.setColor(drewBlur ? mDockBlurTintColor : mDockSolidColor);
+        canvas.drawRoundRect(mDockBounds, radius, radius, mDockFillPaint);
+    }
+
+    private void refreshDockStyle() {
+        Context context = getContext();
+        mDockEnabled = DockBackgroundStyle.isEnabled(context);
+        mDockBlurred = DockBackgroundStyle.isBlurred(context);
+        mDockRadiusPx = DockBackgroundStyle.cornerRadiusPx(context);
+        mDockBlurTintColor = DockBackgroundStyle.blurTintColor(context);
+        mDockSolidColor = DockBackgroundStyle.solidColor(context);
+        mDockStyleInitialized = true;
+    }
+
+    private void updateDockBounds() {
+        ShortcutAndWidgetContainer icons = getShortcutsAndWidgets();
+        if (icons == null || icons.getWidth() <= 0 || icons.getHeight() <= 0) {
+            mDockBounds.setEmpty();
+            return;
+        }
+        DeviceProfile dp = mActivity.getDeviceProfile();
+        int rowHeight = dp.hotseatCellHeightPx > 0
+                ? Math.min(dp.hotseatCellHeightPx, icons.getHeight())
+                : icons.getHeight();
+        float horizontalInset =
+                getResources().getDimension(R.dimen.dock_background_horizontal_inset);
+        float verticalInset = getResources().getDimension(R.dimen.dock_background_vertical_inset);
+        float outerMargin = getResources().getDimension(R.dimen.dock_background_outer_margin);
+        float centerY = (icons.getTop() + icons.getBottom()) / 2f;
+        float left = Math.max(outerMargin, icons.getLeft() - horizontalInset);
+        float right = Math.min(getWidth() - outerMargin, icons.getRight() + horizontalInset);
+        float top = Math.max(0f, centerY - rowHeight / 2f - verticalInset);
+        float bottom = Math.min(getHeight(), centerY + rowHeight / 2f + verticalInset);
+        if (mQsb.getVisibility() == View.VISIBLE && mQsb.getHeight() > 0) {
+            float gap = getResources().getDimension(R.dimen.dock_background_pill_gap);
+            if (mQsb.getTop() >= icons.getBottom()) {
+                // QSB is below the icon row (phones): keep a gap above the search pill.
+                bottom = Math.min(bottom, mQsb.getTop() - gap);
+            } else if (mQsb.getBottom() <= icons.getTop()) {
+                // QSB is above the icon row (taskbar layout): keep a gap below the search pill.
+                top = Math.max(top, mQsb.getBottom() + gap);
+            }
+        }
+        if (right <= left || bottom <= top) {
+            mDockBounds.setEmpty();
+        } else {
+            mDockBounds.set(left, top, right, bottom);
+        }
     }
 
     /**

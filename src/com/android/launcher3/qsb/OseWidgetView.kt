@@ -22,12 +22,14 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import androidx.core.net.toUri
 import com.android.launcher3.Hotseat
+import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherPrefChangeListener
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherPrefsExt
@@ -42,6 +44,7 @@ import com.android.launcher3.util.RunnableList
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.OptionsPopupView
 import com.android.launcher3.views.OptionsPopupView.OptionItem
+import kotlin.math.roundToInt
 
 class OseWidgetView
 @JvmOverloads
@@ -63,6 +66,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             syncSearchVisibility()
         }
     }
+    private val dockAppearanceListener = LauncherPrefChangeListener {
+        (getChildAt(0) as? MinimalSearchBarView)?.refreshStyle()
+    }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -70,6 +76,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             hotseatSearchListener,
             LauncherPrefsExt.HOTSEAT_SEARCH_BAR,
             LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+        )
+        launcherPrefs.addListener(
+            dockAppearanceListener,
+            LauncherPrefsExt.DOCK_BG_STYLE,
+            LauncherPrefsExt.DOCK_BG_COLOR_SOURCE,
+            LauncherPrefsExt.DOCK_BG_COLOR,
+            LauncherPrefsExt.DOCK_BG_OPACITY,
         )
         syncSearchVisibility()
     }
@@ -88,6 +101,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             hotseatSearchListener,
             LauncherPrefsExt.HOTSEAT_SEARCH_BAR,
             LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+        )
+        launcherPrefs.removeListener(
+            dockAppearanceListener,
+            LauncherPrefsExt.DOCK_BG_STYLE,
+            LauncherPrefsExt.DOCK_BG_COLOR_SOURCE,
+            LauncherPrefsExt.DOCK_BG_COLOR,
+            LauncherPrefsExt.DOCK_BG_OPACITY,
         )
         detachedFromWindow()
     }
@@ -114,12 +134,19 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     private fun bindWidgetView(provider: AppWidgetProviderInfo?) {
         removeAllViews()
-        tag = getTagInfo(provider, oseWidgetManager.getActiveWidgetId())
+        val minimal = OseWidgetManager.isMinimalSearchBar(launcherPrefs)
         if (!OseWidgetManager.isSearchBarEnabled(launcherPrefs)) {
+            tag = getTagInfo(null, INVALID_APPWIDGET_ID)
             visibility = View.GONE
             return
         }
         visibility = View.VISIBLE
+        if (minimal) {
+            tag = getTagInfo(null, INVALID_APPWIDGET_ID)
+            addMinimalView()
+            return
+        }
+        tag = getTagInfo(provider, oseWidgetManager.getActiveWidgetId())
         val widgetView = provider?.let { oseWidgetManager.createWidgetView(context) }
         val content = widgetView ?: getDefaultView()
         content.setOnLongClickListener { onLongClick(it) }
@@ -127,6 +154,42 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             content,
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
         )
+    }
+
+    private fun addMinimalView() {
+        val pill =
+            View.inflate(context, R.layout.qsb_minimal_search, null) as MinimalSearchBarView
+        pill.setOnClickListener { openAllAppsSearch(it) }
+        pill.setOnLongClickListener { true }
+        addView(
+            pill,
+            LayoutParams(minimalPillWidth(), minimalPillHeight()).apply {
+                gravity = Gravity.CENTER
+            },
+        )
+        pill.refreshStyle()
+    }
+
+    private fun minimalPillWidth(): Int {
+        val qsbWidth = activityContext.deviceProfile.hotseatQsbWidth
+        val minWidth = resources.getDimensionPixelSize(R.dimen.qsb_minimal_min_width)
+        val maxWidth = resources.getDimensionPixelSize(R.dimen.qsb_minimal_max_width)
+        val baseWidth =
+            if (qsbWidth > 0) {
+                qsbWidth
+            } else {
+                resources.displayMetrics.widthPixels
+            }
+        val target = (baseWidth * MINIMAL_PILL_WIDTH_FRACTION).roundToInt()
+        val width = target.coerceIn(minWidth, maxWidth)
+        return if (qsbWidth > 0) width.coerceAtMost(qsbWidth) else width
+    }
+
+    private fun minimalPillHeight(): Int {
+        val available =
+            activityContext.deviceProfile.getHotseatQsbHeight().takeIf { it > 0 }
+                ?: resources.displayMetrics.heightPixels
+        return resources.getDimensionPixelSize(R.dimen.qsb_minimal_height).coerceAtMost(available)
     }
 
     override fun shouldDelayChildPressedState(): Boolean {
@@ -172,6 +235,15 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         } ?: openDefaultBrowser(view)
     }
 
+    private fun openAllAppsSearch(view: View) {
+        val launcher = activityContext as? Launcher
+        if (launcher != null) {
+            launcher.openAllAppsSearch()
+        } else {
+            openSearch(view)
+        }
+    }
+
     fun openDefaultBrowser(view: View) {
         val browserIntent =
             Intent(Intent.ACTION_VIEW)
@@ -183,6 +255,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     }
 
     override fun onLongClick(view: View?): Boolean {
+        if (OseWidgetManager.isMinimalSearchBar(launcherPrefs)) return false
         val oseWidgetOptionsProvider =
             activityContext.activityComponent.getOseWidgetOptionsProvider()
         val optionItems = oseWidgetOptionsProvider.getOptionItems()
@@ -210,6 +283,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     companion object {
         private val STABLE_ID = Object()
+        private const val MINIMAL_PILL_WIDTH_FRACTION = 0.6f
 
         private fun getTagInfo(provider: AppWidgetProviderInfo?, widgetId: Int): ItemInfo {
             val info =

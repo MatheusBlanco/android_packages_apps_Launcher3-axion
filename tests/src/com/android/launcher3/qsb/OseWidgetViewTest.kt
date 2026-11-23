@@ -19,7 +19,7 @@ package com.android.launcher3.qsb
 import android.appwidget.AppWidgetProviderInfo
 import androidx.test.annotation.UiThreadTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
-import com.android.launcher3.LauncherPrefs
+import com.android.launcher3.LauncherPrefsExt
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppModule
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -44,6 +44,7 @@ import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doNothing
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -72,7 +73,7 @@ class OseWidgetViewTest {
             DaggerOseWidgetViewTest_TestComponent.builder().bindOseWidgetManager(oseWidgetManager)
         )
         context.appComponent.launcherPrefs.put(
-            LauncherPrefs.HOTSEAT_SEARCH_PROVIDER,
+            LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
             widgetInfo.provider.flattenToString(),
         )
         val activityContextComponent = context.activityComponent
@@ -120,6 +121,29 @@ class OseWidgetViewTest {
         mVut.attachedToWindow()
         assertEquals(1, mVut.childCount)
         assertFalse { mVut.getChildAt(0) is QsbWidgetHostView }
+    }
+
+    @Test
+    fun when_minimal_provider_shows_minimal_pill() {
+        context.appComponent.launcherPrefs.put(
+            LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+            OseWidgetManager.SEARCH_PROVIDER_MINIMAL,
+        )
+        mVut.attachedToWindow()
+        assertEquals(1, mVut.childCount)
+        assertTrue { mVut.getChildAt(0) is MinimalSearchBarView }
+        verify(oseWidgetManager, never()).createWidgetView(any())
+    }
+
+    @Test
+    fun when_minimal_provider_long_click_returnsFalse() {
+        context.appComponent.launcherPrefs.put(
+            LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER,
+            OseWidgetManager.SEARCH_PROVIDER_MINIMAL,
+        )
+        mVut.attachedToWindow()
+        assertFalse { mVut.onLongClick(mVut) }
+        verify(oseWidgetOptionsProvider, never()).getOptionItems()
     }
 
     @Test

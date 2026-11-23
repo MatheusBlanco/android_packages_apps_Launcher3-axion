@@ -26,10 +26,14 @@ import android.os.Environment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.android.axion.compose.color.ColorPickerDialog
 import com.android.axion.compose.preferences.ClickablePreference
 import com.android.axion.compose.preferences.ListPreference
 import com.android.axion.compose.preferences.PreferenceGroup
@@ -39,6 +43,7 @@ import com.android.launcher3.LauncherPrefsExt
 import com.android.launcher3.R
 import com.android.launcher3.allapps.search.AxSearchHistory
 import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
+import com.android.launcher3.graphics.DockBackgroundStyle
 import com.android.launcher3.qsb.OseWidgetManager
 
 @Composable
@@ -328,6 +333,7 @@ internal fun SearchScreen(activity: Activity) {
     ) {
         dockSearchPreference.value &&
             dockSearchProviderPreference.value != OseWidgetManager.SEARCH_PROVIDER_NONE &&
+            dockSearchProviderPreference.value != OseWidgetManager.SEARCH_PROVIDER_MINIMAL &&
             oseWidgetManager.canConfigure()
     }
     val suggestionsVisible = rememberPackageEnabled(SUGGESTIONS_PACKAGE)
@@ -345,6 +351,7 @@ internal fun SearchScreen(activity: Activity) {
             }
         }
     }
+    DockBackgroundSettings()
     PreferenceGroup(title = stringResource(R.string.search_app_drawer_category)) {
         item {
             BooleanPreference(
@@ -374,12 +381,16 @@ private fun DockSearchProviderPreference(resumeVersion: Int) {
     val enabledPreference = rememberLauncherPreference(LauncherPrefsExt.HOTSEAT_SEARCH_BAR)
     val providerPreference = rememberLauncherPreference(LauncherPrefsExt.HOTSEAT_SEARCH_PROVIDER)
     val disabledLabel = stringResource(R.string.dock_search_bar_disabled)
+    val minimalLabel = stringResource(R.string.dock_search_bar_minimal)
     val availableProviders = remember(context, resumeVersion) {
         OseWidgetManager.getAvailableSearchWidgets(context)
             .sortedBy { searchProviderLabel(context, it).lowercase() }
     }
-    val options = remember(context, availableProviders, disabledLabel) {
-        listOf(OseWidgetManager.SEARCH_PROVIDER_NONE to disabledLabel) +
+    val options = remember(context, availableProviders, disabledLabel, minimalLabel) {
+        listOf(
+            OseWidgetManager.SEARCH_PROVIDER_NONE to disabledLabel,
+            OseWidgetManager.SEARCH_PROVIDER_MINIMAL to minimalLabel,
+        ) +
             availableProviders.map {
                 it.provider.flattenToString() to searchProviderLabel(context, it)
             }
@@ -395,6 +406,8 @@ private fun DockSearchProviderPreference(resumeVersion: Int) {
             !enabledPreference.value -> OseWidgetManager.SEARCH_PROVIDER_NONE
             selectedProvider == OseWidgetManager.SEARCH_PROVIDER_NONE ->
                 OseWidgetManager.SEARCH_PROVIDER_NONE
+            selectedProvider == OseWidgetManager.SEARCH_PROVIDER_MINIMAL ->
+                OseWidgetManager.SEARCH_PROVIDER_MINIMAL
             options.any { it.first == selectedProvider } -> selectedProvider
             else -> selectedOptionForPackage(availableProviders, selectedProvider)
         }
@@ -404,7 +417,7 @@ private fun DockSearchProviderPreference(resumeVersion: Int) {
         summary = stringResource(R.string.dock_search_bar_summary),
         options = options,
         value = selectedValue,
-        enabled = availableProviders.isNotEmpty(),
+        enabled = true,
         onValueChange = {
             if (it == OseWidgetManager.SEARCH_PROVIDER_NONE) {
                 enabledPreference.onChange(false)
@@ -415,6 +428,107 @@ private fun DockSearchProviderPreference(resumeVersion: Int) {
             }
         },
     )
+}
+
+@Composable
+private fun DockBackgroundSettings() {
+    val context = LocalContext.current
+    val enabledPreference = rememberLauncherPreference(LauncherPrefsExt.DOCK_BG_ENABLED)
+    val stylePreference = rememberLauncherPreference(LauncherPrefsExt.DOCK_BG_STYLE)
+    val colorSourcePreference = rememberLauncherPreference(LauncherPrefsExt.DOCK_BG_COLOR_SOURCE)
+    val colorPreference = rememberLauncherPreference(LauncherPrefsExt.DOCK_BG_COLOR)
+    var pickerVisible by remember { mutableStateOf(false) }
+    val enabled = enabledPreference.value
+
+    if (pickerVisible) {
+        ColorPickerDialog(
+            initialColor = Color(DockBackgroundStyle.customColorOrFallback(context)),
+            title = stringResource(R.string.dock_background_color_title),
+            onDismiss = { pickerVisible = false },
+            onColorSelected = { color ->
+                colorPreference.onChange(color.toArgb())
+                colorSourcePreference.onChange(DockBackgroundStyle.COLOR_SOURCE_CUSTOM)
+                pickerVisible = false
+            },
+        )
+    }
+
+    PreferenceGroup(title = stringResource(R.string.home_settings_dock_background_category)) {
+        item {
+            BooleanPreference(
+                item = LauncherPrefsExt.DOCK_BG_ENABLED,
+                titleRes = R.string.dock_background_title,
+                summaryRes = R.string.dock_background_summary,
+            )
+        }
+        if (enabled) {
+            item {
+                ListPreference(
+                    title = stringResource(R.string.dock_background_style_title),
+                    options = listOf(
+                        DockBackgroundStyle.STYLE_BLUR to
+                            stringResource(R.string.dock_background_style_blur),
+                        DockBackgroundStyle.STYLE_SOLID to
+                            stringResource(R.string.dock_background_style_solid),
+                    ),
+                    value = stylePreference.value,
+                    onValueChange = stylePreference.onChange,
+                )
+            }
+            item {
+                ListPreference(
+                    title = stringResource(R.string.dock_background_color_title),
+                    options = listOf(
+                        DockBackgroundStyle.COLOR_SOURCE_MONET to
+                            stringResource(R.string.dock_background_color_monet),
+                        DockBackgroundStyle.COLOR_SOURCE_CUSTOM to
+                            stringResource(R.string.dock_background_color_custom),
+                    ),
+                    value = colorSourcePreference.value,
+                    onValueChange = { source ->
+                        colorSourcePreference.onChange(source)
+                        if (source == DockBackgroundStyle.COLOR_SOURCE_CUSTOM) {
+                            pickerVisible = true
+                        }
+                    },
+                )
+            }
+            if (colorSourcePreference.value == DockBackgroundStyle.COLOR_SOURCE_CUSTOM) {
+                item {
+                    ClickablePreference(
+                        title = stringResource(R.string.dock_background_custom_color_title),
+                        summary = String.format(
+                            "#%06X",
+                            0xFFFFFF and DockBackgroundStyle.customColorOrFallback(context),
+                        ),
+                        onClick = { pickerVisible = true },
+                    )
+                }
+            }
+            item {
+                IntSliderPreference(
+                    item = LauncherPrefsExt.DOCK_BG_OPACITY,
+                    titleRes = R.string.dock_background_opacity_title,
+                    min = DockBackgroundStyle.MIN_OPACITY,
+                    max = DockBackgroundStyle.MAX_OPACITY,
+                    defaultValue = DockBackgroundStyle.DEFAULT_OPACITY,
+                    interval = 1,
+                    valueLabel = { stringResource(R.string.home_settings_percent_value, it) },
+                )
+            }
+            item {
+                IntSliderPreference(
+                    item = LauncherPrefsExt.DOCK_BG_RADIUS,
+                    titleRes = R.string.dock_background_radius_title,
+                    min = DockBackgroundStyle.MIN_RADIUS_DP,
+                    max = DockBackgroundStyle.MAX_RADIUS_DP,
+                    defaultValue = DockBackgroundStyle.DEFAULT_RADIUS_DP,
+                    interval = 1,
+                    valueLabel = { stringResource(R.string.dock_background_radius_value, it) },
+                )
+            }
+        }
+    }
 }
 
 private fun searchProviderLabel(context: Context, info: AppWidgetProviderInfo): String {

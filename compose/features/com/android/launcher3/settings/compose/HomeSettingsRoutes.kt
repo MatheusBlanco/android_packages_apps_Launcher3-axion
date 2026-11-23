@@ -131,6 +131,12 @@ internal object HomeSettingsRoutes {
             KEY_DRAWER_OPEN_KEYBOARD,
             KEY_HOTSEAT_SEARCH_BAR,
             KEY_HOTSEAT_SEARCH_PROVIDER,
+            KEY_DOCK_BG_ENABLED,
+            KEY_DOCK_BG_STYLE,
+            KEY_DOCK_BG_COLOR_SOURCE,
+            KEY_DOCK_BG_COLOR,
+            KEY_DOCK_BG_OPACITY,
+            KEY_DOCK_BG_RADIUS,
             KEY_SUGGESTIONS -> SEARCH
             KEY_ALL_APPS_DRAWER_SETTINGS,
             KEY_ALL_APPS_DRAWER_OPTIONS,
