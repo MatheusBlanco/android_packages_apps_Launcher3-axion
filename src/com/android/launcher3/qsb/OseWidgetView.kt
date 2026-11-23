@@ -283,7 +283,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     companion object {
         private val STABLE_ID = Object()
-        private const val MINIMAL_PILL_WIDTH_FRACTION = 0.6f
+        private const val MINIMAL_PILL_WIDTH_FRACTION = 0.40f
 
         private fun getTagInfo(provider: AppWidgetProviderInfo?, widgetId: Int): ItemInfo {
             val info =

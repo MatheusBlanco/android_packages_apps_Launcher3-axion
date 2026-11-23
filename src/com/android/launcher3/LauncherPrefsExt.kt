@@ -174,7 +174,7 @@ object LauncherPrefsExt {
         )
     @JvmField val DOCK_BG_RADIUS =
         backedUpItem(
-            "pref_dock_bg_radius",
+            "pref_dock_bg_radius_v2",
             com.android.launcher3.graphics.DockBackgroundStyle.DEFAULT_RADIUS_DP,
             EncryptionType.SECURE_SETTINGS,
         )

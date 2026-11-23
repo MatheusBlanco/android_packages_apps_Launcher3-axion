@@ -46,6 +46,7 @@ import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.graphics.AxBackdropBlurSurface;
 import com.android.launcher3.graphics.DockBackgroundStyle;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.qsb.OseWidgetManager;
 import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.launcher3.util.LauncherBindableItemsContainer.ItemOperator;
 import com.android.launcher3.util.MultiPropertyFactory;
@@ -106,6 +107,8 @@ public class Hotseat extends CellLayout implements Insettable {
     private final RectF mDockBounds = new RectF();
     private boolean mDockPrefsRegistered;
     private boolean mDockStyleInitialized;
+    private boolean mMinimalSearchBar;
+    private boolean mSearchBarEnabled;
     private boolean mDockEnabled;
     private boolean mDockBlurred;
     private float mDockRadiusPx;
@@ -113,6 +116,9 @@ public class Hotseat extends CellLayout implements Insettable {
     private int mDockSolidColor;
     private final LauncherPrefChangeListener mDockPrefListener = key -> {
         refreshDockStyle();
+        if (LauncherPrefsExt.DOCK_BG_ENABLED.getSharedPrefKey().equals(key)) {
+            setInsets(mInsets);
+        }
         invalidate();
     };
 
@@ -329,7 +335,7 @@ public class Hotseat extends CellLayout implements Insettable {
                 lp.width = grid.hotseatBarSizePx + insets.right;
             }
         } else {
-            boolean showQsb = grid.isHotseatQsbEnabled();
+            boolean showQsb = OseWidgetManager.isSearchBarEnabled(getContext());
             mQsb.setVisibility(showQsb ? View.VISIBLE : View.GONE);
             lp.gravity = Gravity.BOTTOM;
             lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
@@ -342,14 +348,60 @@ public class Hotseat extends CellLayout implements Insettable {
         }
 
         Rect padding = grid.getHotseatLayoutPadding(getContext());
-        setPadding(padding.left, padding.top + extraQsbTopInset, padding.right, padding.bottom);
+        boolean searchEnabled = OseWidgetManager.isSearchBarEnabled(getContext());
+        boolean minimal = OseWidgetManager.isMinimalSearchBar(getContext());
+        boolean dockSurface = DockBackgroundStyle.isEnabled(getContext())
+                && !grid.isVerticalBarLayout() && !grid.isQsbInline && !grid.isTaskbarPresent;
+        boolean fixedDockLayout = dockSurface && minimal;
+        int paddingTop;
+        if (fixedDockLayout) {
+            // Keep the dock icon row and surface anchored to the bottom of the hotseat with a
+            // fixed internal padding while the minimal search pill is shown.
+            int bottomMargin = grid.hotseatBarBottomSpacePx;
+            int cellHeight = grid.hotseatCellHeightPx;
+            int verticalInset = getResources()
+                    .getDimensionPixelSize(R.dimen.dock_background_vertical_inset);
+            padding.bottom = bottomMargin;
+            padding.top = lp.height - bottomMargin - cellHeight;
+            paddingTop = padding.top;
+        } else {
+            paddingTop = padding.top + extraQsbTopInset;
+        }
+
+        if (dockSurface) {
+            // Squeeze the dock icons horizontally so the gap between the outer icons and the
+            // dock surface matches the vertical inset.
+            int verticalInset = getResources()
+                    .getDimensionPixelSize(R.dimen.dock_background_vertical_inset);
+            float outerMargin =
+                    getResources().getDimension(R.dimen.dock_background_outer_margin);
+            int iconCount = Math.max(1, grid.numShownHotseatIcons);
+            int iconSize = grid.getWorkspaceIconProfile().getIconSizePx();
+            int cellHeight = grid.hotseatCellHeightPx;
+            int width = grid.getDeviceProperties().getWidthPx();
+            // The visible icon is inset inside its cell vertically, so include that difference
+            // to make the horizontal gap match the visible top/bottom gap.
+            float cellPaddingY = Math.max(0f, (cellHeight - iconSize) / 2f);
+            float targetInset = outerMargin + verticalInset + cellPaddingY;
+            float requiredPadding = (targetInset
+                    - (float) width / (2f * iconCount)
+                    + iconSize / 2f) / (1f - 1f / iconCount);
+            int sidePadding = Math.max(padding.left, Math.round(requiredPadding));
+            padding.left = sidePadding;
+            padding.right = sidePadding;
+        }
+        setPadding(padding.left, paddingTop, padding.right, padding.bottom);
         setLayoutParams(lp);
         InsettableFrameLayout.dispatchInsets(this, insets);
+        mMinimalSearchBar = minimal;
+        mSearchBarEnabled = searchEnabled;
     }
 
     public void refreshQsbLayout() {
+        boolean searchEnabled = OseWidgetManager.isSearchBarEnabled(getContext());
+        boolean minimal = OseWidgetManager.isMinimalSearchBar(getContext());
         boolean changed = mActivity.getDeviceProfile().updateHotseatQsbEnabled(getContext());
-        if (changed) {
+        if (changed || minimal != mMinimalSearchBar || searchEnabled != mSearchBarEnabled) {
             View rootView = mActivity.getRootView();
             if (rootView instanceof LauncherRootView launcherRootView) {
                 launcherRootView.dispatchInsets();
@@ -401,8 +453,11 @@ public class Hotseat extends CellLayout implements Insettable {
 
         DeviceProfile dp = mActivity.getDeviceProfile();
         int qsbWidth = dp.isHotseatQsbEnabled() ? dp.hotseatQsbWidth : 0;
+        int qsbHeight = OseWidgetManager.isMinimalSearchBar(getContext())
+                ? getResources().getDimensionPixelSize(R.dimen.qsb_minimal_height)
+                : dp.getHotseatQsbHeight();
         mQsb.measure(makeMeasureSpec(qsbWidth, MeasureSpec.EXACTLY),
-                makeMeasureSpec(dp.getHotseatQsbHeight(), MeasureSpec.EXACTLY));
+                makeMeasureSpec(qsbHeight, MeasureSpec.EXACTLY));
     }
 
     @Override
@@ -418,6 +473,24 @@ public class Hotseat extends CellLayout implements Insettable {
         }
         int left;
         DeviceProfile dp = mActivity.getDeviceProfile();
+        if (!dp.isQsbInline && !dp.isVerticalBarLayout() && !dp.isTaskbarPresent
+                && OseWidgetManager.isMinimalSearchBar(getContext())) {
+            ShortcutAndWidgetContainer icons = getShortcutsAndWidgets();
+            int iconsTop = icons != null ? icons.getTop() : getPaddingTop();
+            int gap = getResources().getDimensionPixelSize(R.dimen.dock_background_pill_gap);
+            int verticalInset =
+                    getResources().getDimensionPixelSize(R.dimen.dock_background_vertical_inset);
+            int bottom = iconsTop - gap - verticalInset;
+            int top = bottom - qsbMeasuredHeight;
+            if (top < 0) {
+                top = 0;
+                bottom = qsbMeasuredHeight;
+            }
+            left = (r - l - qsbMeasuredWidth) / 2;
+            mQsb.layout(left, top, left + qsbMeasuredWidth, bottom);
+            updateDockBounds();
+            return;
+        }
         if (dp.isQsbInline) {
             int qsbSpace = dp.hotseatBorderSpace;
             left = Utilities.isRtl(getResources()) ? r - getPaddingRight() + qsbSpace
@@ -474,31 +547,38 @@ public class Hotseat extends CellLayout implements Insettable {
     }
 
     private void updateDockBounds() {
+        DeviceProfile dp = mActivity.getDeviceProfile();
+        if (dp.isVerticalBarLayout()) {
+            mDockBounds.setEmpty();
+            return;
+        }
         ShortcutAndWidgetContainer icons = getShortcutsAndWidgets();
         if (icons == null || icons.getWidth() <= 0 || icons.getHeight() <= 0) {
             mDockBounds.setEmpty();
             return;
         }
-        DeviceProfile dp = mActivity.getDeviceProfile();
         int rowHeight = dp.hotseatCellHeightPx > 0
                 ? Math.min(dp.hotseatCellHeightPx, icons.getHeight())
                 : icons.getHeight();
-        float horizontalInset =
-                getResources().getDimension(R.dimen.dock_background_horizontal_inset);
         float verticalInset = getResources().getDimension(R.dimen.dock_background_vertical_inset);
         float outerMargin = getResources().getDimension(R.dimen.dock_background_outer_margin);
         float centerY = (icons.getTop() + icons.getBottom()) / 2f;
-        float left = Math.max(outerMargin, icons.getLeft() - horizontalInset);
-        float right = Math.min(getWidth() - outerMargin, icons.getRight() + horizontalInset);
+        // Keep the horizontal margins fixed so the dock surface doesn't grow/shrink with the
+        // search widget or its provider.
+        float left = outerMargin;
+        float right = getWidth() - outerMargin;
         float top = Math.max(0f, centerY - rowHeight / 2f - verticalInset);
         float bottom = Math.min(getHeight(), centerY + rowHeight / 2f + verticalInset);
-        if (mQsb.getVisibility() == View.VISIBLE && mQsb.getHeight() > 0) {
+
+        boolean minimal = OseWidgetManager.isMinimalSearchBar(getContext());
+        boolean fixedDockLayout = minimal && !dp.isQsbInline && !dp.isTaskbarPresent;
+        if (!fixedDockLayout && mQsb.getVisibility() == View.VISIBLE && mQsb.getHeight() > 0) {
             float gap = getResources().getDimension(R.dimen.dock_background_pill_gap);
             if (mQsb.getTop() >= icons.getBottom()) {
-                // QSB is below the icon row (phones): keep a gap above the search pill.
+                // QSB is below the icon row: keep a gap above the search pill.
                 bottom = Math.min(bottom, mQsb.getTop() - gap);
             } else if (mQsb.getBottom() <= icons.getTop()) {
-                // QSB is above the icon row (taskbar layout): keep a gap below the search pill.
+                // QSB is above the icon row: keep a gap below the search pill.
                 top = Math.max(top, mQsb.getBottom() + gap);
             }
         }

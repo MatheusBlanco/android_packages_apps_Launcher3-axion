@@ -34,7 +34,7 @@ object DockBackgroundStyle {
     const val COLOR_SOURCE_CUSTOM = "custom"
 
     const val DEFAULT_OPACITY = 60
-    const val DEFAULT_RADIUS_DP = 28
+    const val DEFAULT_RADIUS_DP = 40
 
     const val MIN_OPACITY = 0
     const val MAX_OPACITY = 100
