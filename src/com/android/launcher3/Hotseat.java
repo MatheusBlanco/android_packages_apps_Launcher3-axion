@@ -350,9 +350,6 @@ public class Hotseat extends CellLayout implements Insettable {
         Rect padding = grid.getHotseatLayoutPadding(getContext());
         boolean searchEnabled = OseWidgetManager.isSearchBarEnabled(getContext());
         boolean minimal = OseWidgetManager.isMinimalSearchBar(getContext());
-        boolean dockSurface = DockBackgroundStyle.isEnabled(getContext())
-                && searchEnabled
-                && !grid.isVerticalBarLayout() && !grid.isQsbInline && !grid.isTaskbarPresent;
         boolean fixedDockLayout = minimal && !grid.isVerticalBarLayout() && !grid.isQsbInline
                 && !grid.isTaskbarPresent;
         int paddingTop;
@@ -368,28 +365,6 @@ public class Hotseat extends CellLayout implements Insettable {
             paddingTop = padding.top + extraQsbTopInset;
         }
 
-        if (dockSurface) {
-            // Squeeze the dock icons horizontally so the gap between the outer icons and the
-            // dock surface matches the vertical inset.
-            int verticalInset = getResources()
-                    .getDimensionPixelSize(R.dimen.dock_background_vertical_inset);
-            float outerMargin =
-                    getResources().getDimension(R.dimen.dock_background_outer_margin);
-            int iconCount = Math.max(1, grid.numShownHotseatIcons);
-            int iconSize = grid.getWorkspaceIconProfile().getIconSizePx();
-            int cellHeight = grid.hotseatCellHeightPx;
-            int width = grid.getDeviceProperties().getWidthPx();
-            // The visible icon is inset inside its cell vertically, so include that difference
-            // to make the horizontal gap match the visible top/bottom gap.
-            float cellPaddingY = Math.max(0f, (cellHeight - iconSize) / 2f);
-            float targetInset = outerMargin + verticalInset + cellPaddingY;
-            float requiredPadding = (targetInset
-                    - (float) width / (2f * iconCount)
-                    + iconSize / 2f) / (1f - 1f / iconCount);
-            int sidePadding = Math.max(padding.left, Math.round(requiredPadding));
-            padding.left = sidePadding;
-            padding.right = sidePadding;
-        }
         setPadding(padding.left, paddingTop, padding.right, padding.bottom);
         setLayoutParams(lp);
         InsettableFrameLayout.dispatchInsets(this, insets);
