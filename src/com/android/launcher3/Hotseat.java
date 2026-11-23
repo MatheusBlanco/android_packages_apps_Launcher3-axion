@@ -535,7 +535,6 @@ public class Hotseat extends CellLayout implements Insettable {
             return;
         }
         float verticalInset = getResources().getDimension(R.dimen.dock_background_vertical_inset);
-        float outerMargin = getResources().getDimension(R.dimen.dock_background_outer_margin);
         float top;
         float bottom;
         boolean minimal = OseWidgetManager.isMinimalSearchBar(getContext());
@@ -553,6 +552,26 @@ public class Hotseat extends CellLayout implements Insettable {
         }
         top = Math.max(0f, top);
         bottom = Math.min(getHeight(), bottom);
+
+        // Widen the surface just enough that the visible left/right padding matches the visible
+        // top/bottom padding, without changing the icon row spacing.
+        int iconCount = Math.max(1, dp.numShownHotseatIcons);
+        int iconSize = dp.getWorkspaceIconProfile().getIconSizePx();
+        float cellWidth = icons.getWidth() / (float) iconCount;
+        float cellPaddingX = Math.max(0f, (cellWidth - iconSize) / 2f);
+        float visibleLeft = icons.getLeft() + cellPaddingX;
+        float visibleRight = icons.getRight() - cellPaddingX;
+        float contentLeft = visibleLeft;
+        float contentRight = visibleRight;
+        if (!minimal && mQsb.getVisibility() == View.VISIBLE && mQsb.getHeight() > 0) {
+            contentLeft = Math.min(contentLeft, mQsb.getLeft());
+            contentRight = Math.max(contentRight, mQsb.getRight());
+        }
+        float cellPaddingY = Math.max(0f, (dp.hotseatCellHeightPx - iconSize) / 2f);
+        float verticalVisiblePadding = verticalInset + cellPaddingY;
+        float leftLimit = contentLeft - verticalVisiblePadding;
+        float rightLimit = getWidth() - contentRight - verticalVisiblePadding;
+        float outerMargin = Math.max(0f, (leftLimit + rightLimit) / 2f);
 
         // Keep the horizontal margins fixed so the dock surface doesn't grow/shrink with the
         // search widget or its provider.

@@ -503,7 +503,6 @@
     <dimen name="qsb_minimal_min_width">130dp</dimen>
     <dimen name="qsb_minimal_max_width">220dp</dimen>
     <dimen name="dock_background_vertical_inset">8dp</dimen>
-    <dimen name="dock_background_outer_margin">14dp</dimen>
     <dimen name="dock_background_pill_gap">10dp</dimen>
     <dimen name="qsb_minimal_lift">6dp</dimen>
     <dimen name="min_hotseat_icon_space">18dp</dimen>
