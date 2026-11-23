@@ -505,6 +505,7 @@
     <dimen name="dock_background_vertical_inset">8dp</dimen>
     <dimen name="dock_background_outer_margin">14dp</dimen>
     <dimen name="dock_background_pill_gap">10dp</dimen>
+    <dimen name="qsb_minimal_lift">6dp</dimen>
     <dimen name="min_hotseat_icon_space">18dp</dimen>
     <dimen name="max_hotseat_icon_space">50dp</dimen>
     <dimen name="min_hotseat_qsb_width">0dp</dimen>
